@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DischargeViz: Patient Discharge Optimization Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Lighter gray background */
+        }
+        .chart-container {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: all 0.3s ease;
+        }
+        .chart-container:hover {
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
+            transform: translateY(-2px);
+        }
+        .kpi-card {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s ease;
+        }
+        .kpi-icon {
+            flex-shrink: 0;
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            min-width: full;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+    <div class="max-w-screen-2xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-800">DischargeViz</h1>
+            <p class="text-lg text-gray-600 mt-2">Analyze discharge patterns to improve efficiency and facilitate earlier-in-the-day discharges.</p>
+        </header>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="kpi-card">
+                <div class="kpi-icon bg-teal-100 text-teal-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                    <h3 class="text-md font-medium text-gray-500">Avg. Discharge Time</h3>
+                    <p id="avgDischargeTime" class="text-3xl font-bold text-gray-800">-</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                 <div class="kpi-icon bg-sky-100 text-sky-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                </div>
+                <div>
+                    <h3 class="text-md font-medium text-gray-500">% Discharges Before Noon</h3>
+                    <p id="percentBeforeNoon" class="text-3xl font-bold text-gray-800">-%</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                 <div class="kpi-icon bg-blue-100 text-blue-600">
+                   <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                </div>
+                <div>
+                    <h3 class="text-md font-medium text-gray-500">Total Discharges</h3>
+                    <p id="totalDischarges" class="text-3xl font-bold text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                 <div class="kpi-icon bg-indigo-100 text-indigo-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </div>
+                <div>
+                    <h3 class="text-md font-medium text-gray-500">Peak Discharge Hour</h3>
+                    <p id="peakHour" class="text-3xl font-bold text-gray-800">-</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="chart-container lg:col-span-2">
+                <h2 class="text-xl font-semibold text-gray-800">Overall Discharge Trend by Hour</h2>
+                <p class="text-sm text-gray-500 mb-4">Aggregated hourly discharge volume for the entire hospital.</p>
+                <div class="h-80"><canvas id="overallTrendChart"></canvas></div>
+            </div>
+            <div class="chart-container">
+                <h2 class="text-xl font-semibold text-gray-800 text-center">Discharges: Before vs. After Noon</h2>
+                <p class="text-sm text-gray-500 mb-4 text-center">The hospital-wide split between morning and afternoon discharges.</p>
+                <div class="h-80"><canvas id="dischargeSplitChart"></canvas></div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="chart-container">
+                <h2 class="text-xl font-semibold text-gray-800">Physician Performance: Average Discharge Time</h2>
+                <p class="text-sm text-gray-500 mb-4">Ranks physicians by their average discharge hour. Lower is better.</p>
+                <div class="h-96"><canvas id="avgTimeChart"></canvas></div>
+            </div>
+            <div class="chart-container">
+                <h2 class="text-xl font-semibold text-gray-800">Physician Performance: % Discharges Before Noon</h2>
+                <p class="text-sm text-gray-500 mb-4">Ranks physicians by the percentage of their discharges completed before 12 PM.</p>
+                <div class="h-96"><canvas id="percentBeforeNoonChart"></canvas></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6">
+            <!-- Heatmap and Metrics Table in one container -->
+            <div class="chart-container">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Detailed Physician Analysis</h2>
+                <!-- Tabs -->
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <button id="tab-heatmap" onclick="switchTab('heatmap')" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-teal-500 text-teal-600">Hourly Heatmap</button>
+                        <button id="tab-metrics" onclick="switchTab('metrics')" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Metrics Table</button>
+                    </nav>
+                </div>
+                <div id="content-heatmap" class="py-4">
+                    <p class="text-sm text-gray-500 mb-4">A detailed hourly breakdown of every physician's discharge activity.</p>
+                    <div class="table-container"><table id="heatmap" class="heatmap-table"></table></div>
+                </div>
+                <div id="content-metrics" class="py-4 hidden">
+                    <p class="text-sm text-gray-500 mb-4">A ranked summary of performance indicators for each physician.</p>
+                    <div class="table-container"><table id="metricsTable" class="min-w-full divide-y divide-gray-200"></table></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA (from 'initial pivot.csv') ---
+        const physicianData = [
+            { name: "Ahmed, M", discharges: [2, 0, 0, 0, 0, 2, 0, 1, 0, 0, 3, 6, 15, 21, 22, 30, 36, 23, 22, 15, 7, 1, 1, 1] },
+            { name: "Baltag, E", discharges: [0, 0, 0, 0, 0, 0, 0, 1, 2, 7, 16, 21, 20, 31, 42, 36, 20, 7, 1, 2, 1, 0, 0, 0] },
+            { name: "Carson, J", discharges: [0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 7, 8, 10, 15, 14, 18, 12, 16, 5, 1, 1, 0, 0] },
+            { name: "Damera, M", discharges: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3, 12, 15, 21, 25, 37, 34, 29, 19, 11, 4, 0, 0, 0] },
+            { name: "Galili, D", discharges: [0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 6, 15, 14, 22, 25, 38, 20, 27, 10, 2, 2, 0, 0] },
+            { name: "Gandhi, S", discharges: [0, 0, 0, 1, 0, 0, 1, 0, 0, 3, 12, 15, 21, 25, 37, 34, 29, 19, 11, 4, 0, 0, 0] },
+            { name: "Gordon, P", discharges: [0, 0, 0, 0, 2, 0, 0, 0, 4, 6, 6, 19, 19, 15, 27, 28, 25, 15, 3, 3, 2, 0, 0] },
+            { name: "Husain, Z", discharges: [0, 1, 0, 1, 0, 0, 0, 1, 2, 1, 4, 12, 13, 25, 22, 25, 29, 24, 19, 5, 4, 0, 0, 2] },
+            { name: "Hyder, A", discharges: [0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 4, 3, 9, 12, 24, 35, 39, 28, 27, 8, 6, 1, 1, 1] },
+            { name: "Ivan, A", discharges: [0, 0, 0, 0, 0, 0, 0, 1, 2, 6, 6, 8, 17, 21, 21, 19, 12, 5, 5, 1, 0, 0, 0, 0] },
+            { name: "Kamdar, A", discharges: [0, 0, 0, 0, 2, 0, 0, 0, 1, 1, 3, 13, 21, 32, 31, 21, 27, 18, 5, 10, 3, 2, 0, 0] },
+            { name: "Lee, P", discharges: [0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 7, 8, 24, 23, 31, 28, 26, 21, 7, 3, 4, 0, 2, 0] },
+            { name: "Linden, D", discharges: [0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 7, 10, 15, 30, 27, 29, 27, 19, 16, 2, 2, 0, 1, 0] },
+            { name: "Matrov, K", discharges: [0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 13, 18, 19, 19, 31, 29, 24, 11, 7, 5, 0, 1, 0, 0] },
+            { name: "Matta, S", discharges: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 8, 10, 21, 24, 27, 14, 20, 3, 3, 2, 1, 0, 0, 0] },
+            { name: "Phy 16", discharges: [0, 1, 1, 0, 0, 0, 0, 0, 0, 6, 5, 9, 15, 27, 35, 37, 26, 16, 5, 6, 2, 1, 0, 0] },
+            { name: "Phy 17", discharges: [0, 0, 2, 0, 0, 0, 0, 0, 3, 2, 10, 20, 14, 20, 25, 20, 18, 16, 5, 0, 2, 0, 0, 0] },
+            { name: "Phy 18", discharges: [0, 0, 0, 0, 0, 1, 1, 0, 0, 2, 10, 13, 13, 20, 21, 30, 25, 13, 6, 2, 5, 1, 1] },
+            { name: "Phy 19", discharges: [0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 4, 12, 14, 18, 20, 30, 28, 26, 6, 7, 0, 4, 0, 0] },
+            { name: "Phy 20", discharges: [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 4, 11, 16, 20, 17, 26, 24, 37, 23, 8, 6, 3, 0, 1] },
+            { name: "Phy 21", discharges: [0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 7, 12, 16, 31, 22, 32, 25, 39, 9, 4, 0, 1, 0, 0] },
+            { name: "Phy 22", discharges: [0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 7, 11, 16, 16, 21, 33, 31, 32, 7, 4, 3, 1, 0, 0] },
+        ];
+        
+        // --- DATA PROCESSING & ANALYSIS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            Chart.register(ChartDataLabels);
+
+            const processedData = physicianData.map(phy => {
+                const total = phy.discharges.reduce((sum, val) => sum + val, 0);
+                const weightedSum = phy.discharges.reduce((sum, val, hour) => sum + (val * (hour + 0.5)), 0);
+                const averageDischargeTime = total > 0 ? weightedSum / total : 0;
+                
+                const peakValue = Math.max(...phy.discharges);
+                const peakHour = phy.discharges.indexOf(peakValue);
+                
+                const dischargesBeforeNoon = phy.discharges.slice(0, 12).reduce((a, b) => a + b, 0);
+                const percentBeforeNoon = total > 0 ? (dischargesBeforeNoon / total) * 100 : 0;
+
+                return { ...phy, total, averageDischargeTime, peakHour, dischargesBeforeNoon, percentBeforeNoon };
+            });
+
+            // --- KPI CARDS ---
+            const grandTotal = processedData.reduce((sum, phy) => sum + phy.total, 0);
+            const totalWeightedSum = processedData.reduce((sum, phy) => sum + (phy.averageDischargeTime * phy.total), 0);
+            const overallAvgTime = grandTotal > 0 ? totalWeightedSum / grandTotal : 0;
+            const overallBeforeNoon = processedData.reduce((sum, phy) => sum + phy.dischargesBeforeNoon, 0);
+            const overallPercentBeforeNoon = grandTotal > 0 ? (overallBeforeNoon / grandTotal) * 100 : 0;
+            const hourlyTotals = Array(24).fill(0).map((_, i) => processedData.reduce((sum, phy) => sum + phy.discharges[i], 0));
+            const overallPeakHour = hourlyTotals.indexOf(Math.max(...hourlyTotals));
+
+            document.getElementById('totalDischarges').textContent = grandTotal.toLocaleString();
+            document.getElementById('avgDischargeTime').textContent = `${overallAvgTime.toFixed(1)}h`;
+            document.getElementById('percentBeforeNoon').textContent = `${overallPercentBeforeNoon.toFixed(1)}%`;
+            document.getElementById('peakHour').textContent = `${overallPeakHour}:00`;
+
+            // --- RENDER VISUALIZATIONS ---
+            renderOverallTrendChart(hourlyTotals);
+            renderDischargeSplitChart(overallBeforeNoon, grandTotal - overallBeforeNoon);
+            renderAvgTimeChart(processedData);
+            renderPercentBeforeNoonChart(processedData);
+            renderHeatmap(processedData);
+            renderMetricsTable(processedData);
+        });
+
+        // --- CHART RENDERING FUNCTIONS ---
+        function renderOverallTrendChart(hourlyTotals) {
+            const ctx = document.getElementById('overallTrendChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `${i}`),
+                    datasets: [{
+                        label: 'Total Discharges',
+                        data: hourlyTotals,
+                        fill: 'start',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        tension: 0.4,
+                        pointRadius: 0,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false }, datalabels: { display: false } } }
+            });
+        }
+
+        function renderDischargeSplitChart(beforeNoon, afterNoon) {
+            const ctx = document.getElementById('dischargeSplitChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Before 12 PM', 'After 12 PM'],
+                    datasets: [{
+                        data: [beforeNoon, afterNoon],
+                        backgroundColor: ['rgba(14, 165, 233, 0.8)', 'rgba(203, 213, 225, 0.8)'],
+                        borderColor: ['#fff'],
+                        borderWidth: 4,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '60%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { padding: 20, font: {size: 14} } },
+                        datalabels: {
+                            color: '#fff',
+                            font: { weight: 'bold', size: 16 },
+                            formatter: (value, ctx) => {
+                                const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                const percentage = (value / total * 100).toFixed(1) + '%';
+                                return percentage;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderAvgTimeChart(data) {
+            const sortedData = [...data].sort((a, b) => a.averageDischargeTime - b.averageDischargeTime);
+            const ctx = document.getElementById('avgTimeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedData.map(p => p.name),
+                    datasets: [{
+                        label: 'Average Discharge Time',
+                        data: sortedData.map(p => p.averageDischargeTime),
+                        backgroundColor: 'rgba(20, 184, 166, 0.7)',
+                        borderColor: 'rgba(15, 118, 110, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true, title: { display: true, text: 'Average Hour of Day' } } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'right', formatter: (v) => v.toFixed(1) + 'h' } } }
+            });
+        }
+
+        function renderPercentBeforeNoonChart(data) {
+            const sortedData = [...data].sort((a, b) => b.percentBeforeNoon - a.percentBeforeNoon);
+            const ctx = document.getElementById('percentBeforeNoonChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedData.map(p => p.name),
+                    datasets: [{
+                        label: '% Before Noon',
+                        data: sortedData.map(p => p.percentBeforeNoon),
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true, max: 100, title: { display: true, text: '% of Discharges' } } }, plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'right', formatter: (v) => v.toFixed(1) + '%' } } }
+            });
+        }
+
+        function renderHeatmap(data) {
+            const table = document.getElementById('heatmap');
+            const maxValue = Math.max(...data.flatMap(p => p.discharges));
+            const colorScale = (value) => {
+                if (value === 0) return { bg: '#ffffff', text: '#6b7280' };
+                const intensity = Math.sqrt(value / maxValue);
+                if (intensity > 0.85) return { bg: '#0f766e', text: '#ffffff' }; 
+                if (intensity > 0.65) return { bg: '#14b8a6', text: '#ffffff' }; 
+                if (intensity > 0.45) return { bg: '#5eead4', text: '#1f2937' }; 
+                if (intensity > 0.20) return { bg: '#99f6e4', text: '#1f2937' }; 
+                return { bg: '#ccfbf1', text: '#4b5563' }; 
+            };
+            let headerHtml = '<thead><tr class="bg-gray-50"><th class="sticky left-0 bg-gray-50 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Physician</th>';
+            for (let i = 0; i < 24; i++) headerHtml += `<th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">${i}</th>`;
+            headerHtml += '</tr></thead>';
+            let bodyHtml = '<tbody>';
+            data.forEach(phy => {
+                bodyHtml += '<tr class="border-t border-gray-200">';
+                bodyHtml += `<td class="sticky left-0 bg-white px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-700">${phy.name}</td>`;
+                phy.discharges.forEach(val => {
+                    const { bg, text } = colorScale(val);
+                    bodyHtml += `<td style="background-color: ${bg}; color: ${text};" class="px-4 py-2 text-center text-sm">${val > 0 ? val : ''}</td>`;
+                });
+                bodyHtml += '</tr>';
+            });
+            bodyHtml += '</tbody>';
+            table.innerHTML = headerHtml + bodyHtml;
+        }
+
+        function renderMetricsTable(data) {
+            const table = document.getElementById('metricsTable');
+            const sortedData = [...data].sort((a,b) => b.total - a.total);
+            let headerHtml = `
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Physician</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Discharges</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Before Noon</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peak Hour</th>
+                    </tr>
+                </thead>`;
+            let bodyHtml = '<tbody class="bg-white divide-y divide-gray-200">';
+            sortedData.forEach((phy, index) => {
+                bodyHtml += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">${index + 1}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">${phy.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${phy.total}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${phy.averageDischargeTime.toFixed(1)}h</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${phy.percentBeforeNoon.toFixed(1)}%</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${phy.peakHour}:00</td>
+                    </tr>
+                `;
+            });
+            bodyHtml += '</tbody>';
+            table.innerHTML = headerHtml + bodyHtml;
+        }
+
+        // --- TAB SWITCHING LOGIC ---
+        function switchTab(tabName) {
+            document.getElementById('content-heatmap').classList.toggle('hidden', tabName !== 'heatmap');
+            document.getElementById('content-metrics').classList.toggle('hidden', tabName !== 'metrics');
+            
+            document.getElementById('tab-heatmap').classList.toggle('border-teal-500', tabName === 'heatmap');
+            document.getElementById('tab-heatmap').classList.toggle('text-teal-600', tabName === 'heatmap');
+            document.getElementById('tab-heatmap').classList.toggle('border-transparent', tabName !== 'heatmap');
+            document.getElementById('tab-heatmap').classList.toggle('text-gray-500', tabName !== 'heatmap');
+
+            document.getElementById('tab-metrics').classList.toggle('border-teal-500', tabName === 'metrics');
+            document.getElementById('tab-metrics').classList.toggle('text-teal-600', tabName === 'metrics');
+            document.getElementById('tab-metrics').classList.toggle('border-transparent', tabName !== 'metrics');
+            document.getElementById('tab-metrics').classList.toggle('text-gray-500', tabName !== 'metrics');
+        }
+    </script>
+</body>
+</html>

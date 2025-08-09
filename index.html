@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DischargeViz — Patient Discharge Optimization Dashboard (Prototype)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background: #f8fafc; }
+    .chart-container { background: white; padding: 1.5rem; border-radius: .75rem; border: 1px solid #e6eef6; }
+    .kpi-card { background: white; padding: 1rem; border-radius: .5rem; border: 1px solid #edf2f7; display:flex; gap: .75rem; align-items:center }
+    .sticky-col { position: sticky; left: 0; background:white; }
+    .mini { font-size: .8rem; color:#6b7280 }
+    /* small responsive tweaks */
+    @media (max-width:1024px){ .lg\\:col-span-2{ grid-column: span 1 / span 1 } }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+  <div class="max-w-screen-2xl mx-auto">
+    <header class="mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-slate-800">DischargeViz</h1>
+          <p class="mini">Actionable analytics + optimization suggestions to move discharges earlier and improve throughput.</p>
+        </div>
+        <div class="flex gap-3 items-center">
+          <label class="mini text-slate-600">Physician</label>
+          <input id="physicianFilter" placeholder="All physicians" class="px-3 py-2 border rounded-md" />
+          <button id="downloadCsv" class="px-3 py-2 bg-sky-600 text-white rounded-md">Export CSV</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="kpi-card">
+        <div class="w-12 h-12 rounded-md bg-teal-100 flex items-center justify-center">🕒</div>
+        <div>
+          <div class="mini">Avg. Discharge Time</div>
+          <div id="avgDischargeTime" class="text-2xl font-semibold">-</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="w-12 h-12 rounded-md bg-sky-100 flex items-center justify-center">🌤️</div>
+        <div>
+          <div class="mini">% Before 12 PM</div>
+          <div id="percentBeforeNoon" class="text-2xl font-semibold">-</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="w-12 h-12 rounded-md bg-blue-100 flex items-center justify-center">📈</div>
+        <div>
+          <div class="mini">Total Discharges</div>
+          <div id="totalDischarges" class="text-2xl font-semibold">0</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="w-12 h-12 rounded-md bg-indigo-100 flex items-center justify-center">⚡</div>
+        <div>
+          <div class="mini">Peak Discharge Hour</div>
+          <div id="peakHour" class="text-2xl font-semibold">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div class="chart-container lg:col-span-2">
+        <h3 class="font-semibold mb-2">Hospital hourly discharge trend</h3>
+        <p class="mini mb-3">Roll-up across selected scope (all physicians / filtered physician / date range).</p>
+        <div style="height:260px"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="chart-container">
+        <h3 class="font-semibold mb-2">Before vs After Noon</h3>
+        <div style="height:260px"><canvas id="splitChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Physician performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="chart-container">
+        <h3 class="font-semibold mb-2">Physician: Avg discharge hour (lower = better)</h3>
+        <div style="height:380px"><canvas id="physAvgChart"></canvas></div>
+      </div>
+      <div class="chart-container">
+        <h3 class="font-semibold mb-2">Physician: % discharges before noon</h3>
+        <div style="height:380px"><canvas id="physPercentChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Heatmap + Suggestions -->
+    <div class="chart-container mb-6">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-semibold">Hourly heatmap (by physician)</h3>
+        <div class="mini text-slate-500">Hover a cell to see raw value & normalized intensity</div>
+      </div>
+      <div class="table-container overflow-auto"><table id="heatmap" class="min-w-full"></table></div>
+
+      <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="p-4 border rounded">
+          <h4 class="font-semibold">Top Quick Wins</h4>
+          <ol class="mini mt-2 list-decimal list-inside" id="quickWins"></ol>
+        </div>
+        <div class="p-4 border rounded">
+          <h4 class="font-semibold">Triage Suggestions (AI)</h4>
+          <div class="mini mt-2" id="aiSuggestions"></div>
+        </div>
+        <div class="p-4 border rounded">
+          <h4 class="font-semibold">Operational Actions</h4>
+          <div class="mini mt-2" id="opsActions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metrics table -->
+    <div class="chart-container">
+      <h3 class="font-semibold mb-2">Metrics table</h3>
+      <div class="table-container overflow-auto"><table id="metricsTable" class="min-w-full"></table></div>
+    </div>
+  </div>
+
+  <script>
+    // ------------------------------
+    // Prototype data (same pivot-like dataset from user) — kept inline for prototyping
+    // ------------------------------
+    const physicianData = [
+      { name: "Ahmed, M", discharges: [2,0,0,0,0,2,0,1,0,0,3,6,15,21,22,30,36,23,22,15,7,1,1,1] },
+      { name: "Baltag, E", discharges: [0,0,0,0,0,0,0,1,2,7,16,21,20,31,42,36,20,7,1,2,1,0,0,0] },
+      { name: "Carson, J", discharges: [0,1,0,0,1,0,0,1,1,0,0,7,8,10,15,14,18,12,16,5,1,1,0,0] },
+      { name: "Damera, M", discharges: [0,0,0,1,0,0,0,1,0,0,3,12,15,21,25,37,34,29,19,11,4,0,0,0] },
+      { name: "Galili, D", discharges: [0,0,0,0,0,0,1,0,1,2,6,15,14,22,25,38,20,27,10,2,2,0,0] },
+      { name: "Gandhi, S", discharges: [0,0,0,1,0,0,1,0,0,3,12,15,21,25,37,34,29,19,11,4,0,0,0] },
+      { name: "Gordon, P", discharges: [0,0,0,0,2,0,0,0,4,6,6,19,19,15,27,28,25,15,3,3,2,0,0] },
+      { name: "Husain, Z", discharges: [0,1,0,1,0,0,0,1,2,1,4,12,13,25,22,25,29,24,19,5,4,0,0,2] },
+      { name: "Hyder, A", discharges: [0,0,0,1,1,1,0,0,0,1,4,3,9,12,24,35,39,28,27,8,6,1,1,1] },
+      { name: "Ivan, A", discharges: [0,0,0,0,0,0,0,1,2,6,6,8,17,21,21,19,12,5,5,1,0,0,0,0] },
+      { name: "Kamdar, A", discharges: [0,0,0,0,2,0,0,0,1,1,3,13,21,32,31,21,27,18,5,10,3,2,0,0] },
+      { name: "Lee, P", discharges: [0,0,0,0,0,0,0,2,0,0,7,8,24,23,31,28,26,21,7,3,4,0,2,0] },
+      { name: "Linden, D", discharges: [0,0,0,0,0,0,0,0,0,2,7,10,15,30,27,29,27,19,16,2,2,0,1,0] },
+      { name: "Matrov, K", discharges: [0,0,0,0,0,0,0,0,1,5,13,18,19,19,31,29,24,11,7,5,0,1,0,0] },
+      { name: "Matta, S", discharges: [0,0,0,0,0,0,0,0,0,4,8,10,21,24,27,14,20,3,3,2,1,0,0,0] },
+      { name: "Phy 16", discharges: [0,1,1,0,0,0,0,0,0,6,5,9,15,27,35,37,26,16,5,6,2,1,0,0] },
+      { name: "Phy 17", discharges: [0,0,2,0,0,0,0,0,3,2,10,20,14,20,25,20,18,16,5,0,2,0,0,0] },
+      { name: "Phy 18", discharges: [0,0,0,0,0,1,1,0,0,2,10,13,13,20,21,30,25,13,6,2,5,1,1] },
+      { name: "Phy 19", discharges: [0,0,0,1,0,0,0,1,1,1,4,12,14,18,20,30,28,26,6,7,0,4,0,0] },
+      { name: "Phy 20", discharges: [0,0,0,1,0,0,0,0,0,1,4,11,16,20,17,26,24,37,23,8,6,3,0,1] },
+      { name: "Phy 21", discharges: [0,0,0,0,0,0,0,1,2,1,7,12,16,31,22,32,25,39,9,4,0,1,0,0] },
+      { name: "Phy 22", discharges: [0,1,0,0,0,0,0,0,0,1,7,11,16,16,21,33,31,32,7,4,3,1,0,0] }
+    ];
+
+    // Utilities: compute metrics for each physician
+    function computeMetrics(data){
+      return data.map(p => {
+        const total = p.discharges.reduce((a,b)=>a+b,0);
+        const weighted = p.discharges.reduce((s,v,i)=>s + v*(i+0.5),0);
+        const avg = total>0? weighted/total : 0;
+        const beforeNoon = p.discharges.slice(0,12).reduce((a,b)=>a+b,0);
+        const pctBefore = total>0? (beforeNoon/total)*100:0;
+        const peak = p.discharges.indexOf(Math.max(...p.discharges));
+        return {...p, total, averageDischargeTime: avg, beforeNoon, pctBefore, peak};
+      });
+    }
+
+    // Global state (simple prototype)
+    let processed = computeMetrics(physicianData);
+
+    // Aggregate
+    function aggregateHourly(data){
+      const hours = Array(24).fill(0);
+      data.forEach(p=> p.discharges.forEach((v,i)=> hours[i]+=v));
+      return hours;
+    }
+
+    function recomputeAndRender(filterName){
+      let data = processed;
+      if(filterName && filterName.trim().length>0){
+        data = processed.filter(p => p.name.toLowerCase().includes(filterName.toLowerCase()));
+      }
+      const total = data.reduce((s,p)=>s+p.total,0);
+      const weightedAll = data.reduce((s,p)=>s + p.averageDischargeTime * p.total,0);
+      const avgAll = total>0? weightedAll/total : 0;
+      const beforeAll = data.reduce((s,p)=>s+p.beforeNoon,0);
+      const pctBeforeAll = total>0? (beforeAll/total)*100 : 0;
+      const hourly = data.length? data[0].discharges.map((_,i)=> data.reduce((s,p)=> s + p.discharges[i],0)) : Array(24).fill(0);
+      const peak = hourly.indexOf(Math.max(...hourly));
+
+      document.getElementById('totalDischarges').textContent = total.toLocaleString();
+      document.getElementById('avgDischargeTime').textContent = avgAll.toFixed(1) + 'h';
+      document.getElementById('percentBeforeNoon').textContent = pctBeforeAll.toFixed(1) + '%';
+      document.getElementById('peakHour').textContent = peak + ':00';
+
+      renderTrendChart(hourly);
+      renderSplitChart(beforeAll, total-beforeAll);
+      renderPhysicianCharts(data);
+      renderHeatmap(data);
+      renderMetricsTable(data);
+      renderSuggestions(data, hourly);
+    }
+
+    // Chart instances holders for updates
+    let trendChart, splitChart, physAvgChart, physPctChart;
+
+    // Create charts with ability to update datasets (keeps prototype snappy)
+    function renderTrendChart(hourly){
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if(trendChart){ trendChart.data.datasets[0].data = hourly; trendChart.update(); return; }
+      trendChart = new Chart(ctx, {
+        type: 'line', data: { labels: [...Array(24).keys()].map(i=>String(i)), datasets:[{ label:'Discharges', data:hourly, tension:.35, fill:true, backgroundColor:'rgba(34,197,94,0.08)', borderColor:'rgba(16,185,129,1)' }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true } } }
+      });
+    }
+
+    function renderSplitChart(before, after){
+      const ctx = document.getElementById('splitChart').getContext('2d');
+      if(splitChart){ splitChart.data.datasets[0].data = [before, after]; splitChart.update(); return; }
+      splitChart = new Chart(ctx, { type:'doughnut', data:{ labels:['Before 12 PM','After 12 PM'], datasets:[{ data:[before,after], backgroundColor:['rgba(14,165,233,.9)','rgba(203,213,225,.9)'], borderWidth:3 }] }, options:{ cutout:'60%', plugins:{ legend:{position:'bottom'} } } });
+    }
+
+    function renderPhysicianCharts(data){
+      const sortedAvg = [...data].sort((a,b)=>a.averageDischargeTime-b.averageDischargeTime);
+      const ctxA = document.getElementById('physAvgChart').getContext('2d');
+      if(physAvgChart){ physAvgChart.data.labels = sortedAvg.map(p=>p.name); physAvgChart.data.datasets[0].data = sortedAvg.map(p=>p.averageDischargeTime); physAvgChart.update(); }
+      else {
+        physAvgChart = new Chart(ctxA, { type:'bar', data:{ labels:sortedAvg.map(p=>p.name), datasets:[{ data:sortedAvg.map(p=>p.averageDischargeTime), borderRadius:6 }] }, options:{ indexAxis:'y', plugins:{ legend:{display:false}, datalabels:{anchor:'end',align:'right',formatter:v=>v.toFixed(1)+'h'} }, scales:{ x:{beginAtZero:true}} } });
+      }
+
+      const sortedPct = [...data].sort((a,b)=>b.pctBefore-a.pctBefore);
+      const ctxB = document.getElementById('physPercentChart').getContext('2d');
+      if(physPctChart){ physPctChart.data.labels = sortedPct.map(p=>p.name); physPctChart.data.datasets[0].data = sortedPct.map(p=>p.pctBefore); physPctChart.update(); }
+      else {
+        physPctChart = new Chart(ctxB, { type:'bar', data:{ labels:sortedPct.map(p=>p.name), datasets:[{ data:sortedPct.map(p=>p.pctBefore) }] }, options:{ indexAxis:'y', plugins:{ legend:{display:false}, datalabels:{anchor:'end',align:'right',formatter:v=>v.toFixed(1)+'%'} }, scales:{ x:{ beginAtZero:true, max:100 } } });
+      }
+    }
+
+    function renderHeatmap(data){
+      const table = document.getElementById('heatmap');
+      const maxVal = Math.max(...data.flatMap(p=>p.discharges));
+      let html = '<thead><tr><th class="sticky-col px-4 py-2">Physician</th>' + Array.from({length:24},(_,i)=>`<th class="px-3 py-2 text-center mini">${i}</th>`).join('') + '</tr></thead><tbody>';
+      data.forEach(p=>{
+        html += `<tr class="border-t"><td class="sticky-col px-4 py-2">${p.name}</td>`;
+        p.discharges.forEach(v=>{
+          const intensity = maxVal? Math.round((v/maxVal)*100) : 0;
+          const bg = v===0? '#fff' : `rgba(20,184,166,${0.25 + intensity/140})`;
+          html += `<td title="${v} discharges — intensity ${intensity}%" style="background:${bg}; text-align:center; padding:.4rem;">${v||''}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    function renderMetricsTable(data){
+      const table = document.getElementById('metricsTable');
+      const sorted = [...data].sort((a,b)=>b.total-a.total);
+      let html = '<thead class="bg-gray-50"><tr><th class="px-4 py-2">Rank</th><th class="px-4 py-2">Physician</th><th class="px-4 py-2">Total</th><th class="px-4 py-2">Avg Hour</th><th class="px-4 py-2">% Before Noon</th><th class="px-4 py-2">Peak Hour</th></tr></thead><tbody>';
+      sorted.forEach((p,i)=>{
+        html += `<tr class="hover:bg-slate-50"><td class="px-4 py-2">${i+1}</td><td class="px-4 py-2">${p.name}</td><td class="px-4 py-2">${p.total}</td><td class="px-4 py-2">${p.averageDischargeTime.toFixed(1)}h</td><td class="px-4 py-2">${p.pctBefore.toFixed(1)}%</td><td class="px-4 py-2">${p.peak}:00</td></tr>`;
+      });
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    // Simple heuristics to generate quick wins & suggestions
+    function renderSuggestions(data, hourly){
+      // Quick wins — physicians with high avg hour OR low pctBefore
+      const byAvgDesc = [...data].sort((a,b)=>b.averageDischargeTime - a.averageDischargeTime).slice(0,3).map(p=>p.name);
+      const byPctAsc = [...data].sort((a,b)=>a.pctBefore - b.pctBefore).slice(0,3).map(p=>p.name);
+      const quick = [...new Set([...byAvgDesc, ...byPctAsc])];
+      const qEl = document.getElementById('quickWins'); qEl.innerHTML = '';
+      quick.forEach((n,i)=> { const li = document.createElement('li'); li.textContent = `${n} — review discharge workflow (medication reconciliation, transportation, final MD note).`; qEl.appendChild(li); });
+
+      // AI-style suggestions (deterministic heuristics for prototype)
+      const ai = [];
+      // 1) Shift pharmacy rounds earlier when morning discharge % < 60
+      const total = data.reduce((s,p)=>s+p.total,0);
+      const before = data.reduce((s,p)=>s+p.beforeNoon,0);
+      const pctBefore = total? (before/total)*100 : 0;
+      if(pctBefore < 60) ai.push('Schedule pharmacy verification and medication reconciliation rounds earlier (target completion by 9:30am).');
+      if(hourly[8] > hourly[14]) ai.push('8AM has high discharges — consolidate discharge packet printing and transportation between 8–10AM to avoid bottlenecks.');
+      if(hourly[16] > hourly[10]) ai.push('Afternoon peak is dominant — consider dedicated afternoon transport team or adding float nurses for discharge tasks 3–5PM.');
+      if(ai.length===0) ai.push('Discharge distribution looks balanced — standardize morning huddles and ensure EHR discharge tasks are triggered by 9AM.');
+      document.getElementById('aiSuggestions').innerHTML = ai.map(a=>`<div>• ${a}</div>`).join('');
+
+      // Ops actions
+      const ops = [];
+      ops.push('Create a "Discharge Ready" flag in EHR visible to transport & bed management.');
+      ops.push('Implement daily 8:30AM multidisciplinary discharge huddle for high-volume services.');
+      document.getElementById('opsActions').innerHTML = ops.map(o=>`<div>• ${o}</div>`).join('');
+    }
+
+    // Export CSV
+    function downloadCSV(data){
+      // Flatten to rows: physician, hour0..hour23, total
+      const rows = [['physician', ...Array.from({length:24},(_,i)=>`h${i}`), 'total']];
+      data.forEach(p => rows.push([p.name, ...p.discharges, p.total]));
+      const csv = rows.map(r => r.map(c=>typeof c==='string'? '"'+c.replace(/"/g,'""')+'"' : c).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'dischargeviz_export.csv'; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
+    }
+
+    // UI wiring
+    document.getElementById('physicianFilter').addEventListener('input', (e)=> recomputeAndRender(e.target.value));
+    document.getElementById('downloadCsv').addEventListener('click', ()=> downloadCSV(processed));
+
+    // Initialize
+    recomputeAndRender('');
+
+    // NOTES for next steps (these are inside the prototype file as comments):
+    /*
+      Backend + infra suggestions (next stage):
+
+      - Stack: Next.js 15 (TypeScript) or Remix / Astro for frontend, Node/Express or Fastify for API, Postgres (or Timescale if we want time-series ops), Redis for caching/leaderboards.
+      - Data model (Postgres): physicians(id,name), discharges(id,physician_id,patient_id,discharge_time,discharge_date,discharge_status,notes), transports(id,discharge_id,scheduled_time,completed_time), med_clearance(id,discharge_id,completed_at).
+      - APIs: /api/metrics?start=YYYY-MM-DD&end=YYYY-MM-DD&physician=..., /api/discharges/export, /api/recommendations (ML service) -> returns prioritized ops.
+      - Batch ingestion: ETL from EHR HL7/FHIR feed to create daily aggregated pivot (also store raw events for ML). Use worker (BullMQ) to compute overnight aggregates.
+      - ML/optimizations: use a simple gradient boosted tree (XGBoost/LightGBM) to predict "discharge-ready by 10AM" probability. Features: admission reason, LOS, meds pending, pending tests, time of MD note, previous discharge patterns, bed move counts.
+      - Privacy & security: PHI must stay in HIPAA-compliant environment. Use encryption at rest, RBAC, thorough audit logs.
+
+      UX / product improvements:
+      - Add date range picker and compare-week-over-week small multiples.
+      - Add simulation mode: "If pharmacy rounds moved to 8:30AM, estimated % before noon +X%" (use model or simple heuristics).
+      - Add drill-down: click physician -> show patient-level queue with actionable tasks (transport requested, med reconciliation pending, final note pending).
+
+      KPIs to measure post-rollout:
+      - % discharges before 12PM (primary)
+      - Average discharge time (hour)
+      - Average time between discharge order and actual departure (minutes)
+      - Transport fulfillment time (minutes)
+      - Med reconciliation time (minutes)
+
+      Quick technical improvements to prototype:
+      - Replace inline data with fetch('/api/data') and add authentication.
+      - Add unit tests for metric calculations.
+      - Add role-based views for nursing, bed management, and physicians.
+    */
+  </script>
+</body>
+</html>
