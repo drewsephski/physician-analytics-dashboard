@@ -10,7 +10,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useOnboarding } from './onboarding-provider';
+import { useOnboarding as useCourseAwareOnboarding } from './course-aware-onboarding-provider';
 import {
   X,
   Play,
@@ -31,7 +31,7 @@ interface WelcomeModalProps {
 
 export function WelcomeModal({ onClose }: WelcomeModalProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const { startOnboarding } = useOnboarding();
+  const { startOnboarding } = useCourseAwareOnboarding();
 
   useEffect(() => {
     // Check if user has seen the welcome modal before

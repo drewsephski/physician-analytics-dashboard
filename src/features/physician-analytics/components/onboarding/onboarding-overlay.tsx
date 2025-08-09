@@ -10,7 +10,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useOnboarding } from './onboarding-provider';
+import { useOnboarding as useCourseAwareOnboarding } from './course-aware-onboarding-provider';
 import {
   X,
   ChevronRight,
@@ -37,7 +37,7 @@ export function OnboardingOverlay({}: OnboardingOverlayProps) {
     nextStep,
     previousStep,
     getStepsForSection
-  } = useOnboarding();
+  } = useCourseAwareOnboarding();
 
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
   const [overlayPosition, setOverlayPosition] = useState({ top: 0, left: 0 });

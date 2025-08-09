@@ -30,11 +30,11 @@ import { HourlyHeatmap } from './hourly-heatmap';
 import {
   CourseAwareOnboardingProvider,
   OnboardingOverlay,
-  OnboardingControls,
   HospitalTooltips,
   WelcomeModal,
   HospitalContextualHelp,
   CourseProgressIndicator,
+  CourseAwareOnboardingControls,
   QuickReference
 } from './onboarding';
 import {
@@ -144,8 +144,8 @@ export function PhysicianAnalyticsPage() {
             </div>
           </div>
 
-          {/* Onboarding Controls */}
-          <OnboardingControls />
+          {/* Course-Aware Onboarding Controls */}
+          <CourseAwareOnboardingControls />
 
           {/* Summary Stats Cards */}
           <div

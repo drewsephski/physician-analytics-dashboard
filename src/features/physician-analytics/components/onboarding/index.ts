@@ -10,4 +10,5 @@ export { WelcomeModal } from './welcome-modal';
 export { ContextualHelp, HospitalContextualHelp } from './contextual-help';
 export { ProgressIndicator } from './progress-indicator';
 export { CourseProgressIndicator } from './course-progress-indicator';
+export { CourseAwareOnboardingControls } from './course-aware-onboarding-controls';
 export { QuickReference } from './quick-reference';

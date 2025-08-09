@@ -19,6 +19,7 @@ import {
   processPhysicianData,
   calculateOverallMetrics
 } from '@/lib/discharge-utils';
+import TopPhysicianPerformanceChart from '@/features/overview/components/top-physician-performance-chart';
 import React from 'react';
 
 export default function OverViewLayout({
@@ -215,6 +216,9 @@ export default function OverViewLayout({
           </div>
           <div className='col-span-4'>{area_stats}</div>
           <div className='col-span-4 md:col-span-3'>{pie_stats}</div>
+        </div>
+        <div className='grid grid-cols-1 gap-6'>
+          <TopPhysicianPerformanceChart />
         </div>
       </div>
     </PageContainer>

@@ -36,7 +36,8 @@ import {
   IconTable,
   IconChartDots3,
   IconReportAnalytics,
-  IconBook
+  IconBook,
+  IconMessageCircle
 } from '@tabler/icons-react';
 
 export type Icon = React.ComponentType<IconProps>;
@@ -78,5 +79,6 @@ export const Icons = {
   heatmap: IconTable,
   dataViz: IconChartDots3,
   reports: IconReportAnalytics,
-  bookOpen: IconBook
+  bookOpen: IconBook,
+  messageCircle: IconMessageCircle
 };

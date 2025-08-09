@@ -1,0 +1,39 @@
+.onboarding-card {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  max-width: 400px;
+  margin: 20px auto;
+}
+
+.onboarding-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.onboarding-card-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.onboarding-card-header button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #888;
+}
+
+.onboarding-card-content p {
+  margin: 0;
+  line-height: 1.6;
+  color: #555;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
